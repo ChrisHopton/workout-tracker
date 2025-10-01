@@ -37,11 +37,54 @@ router.post('/', async (req, res, next) => {
   }
 });
 
+const parseRequiredNumber = (value) => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return value;
+    }
+    const parsed = Number(trimmed);
+    return Number.isNaN(parsed) ? value : parsed;
+  }
+  return value;
+};
+
+const parseOptionalNumber = (value) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    const parsed = Number(trimmed);
+    return Number.isNaN(parsed) ? value : parsed;
+  }
+  if (typeof value === 'number') {
+    return value;
+  }
+  return value;
+};
+
 const setSchema = z.object({
-  exercise_id: z.number().int().positive(),
-  set_number: z.number().int().positive(),
-  actual_reps: z.number().int().positive().nullable(),
-  actual_weight: z.number().nonnegative().nullable(),
+  exercise_id: z.preprocess(
+    parseRequiredNumber,
+    z.number().int().positive()
+  ),
+  set_number: z.preprocess(parseRequiredNumber, z.number().int().positive()),
+  actual_reps: z
+    .preprocess(
+      parseOptionalNumber,
+      z.union([z.number().int().min(0), z.null()])
+    )
+    .transform((value) => (value ?? null)),
+  actual_weight: z
+    .preprocess(
+      parseOptionalNumber,
+      z.union([z.number().min(0), z.null()])
+    )
+    .transform((value) => (value ?? null)),
 });
 
 router.post('/:id/sets/bulk', async (req, res, next) => {
@@ -68,10 +111,10 @@ router.post('/:id/sets/bulk', async (req, res, next) => {
     }));
 
     if (rows.length) {
-      const insertQuery = knex('session_sets')
+      await knex('session_sets')
         .insert(rows)
-        .onDuplicateUpdate(['actual_reps', 'actual_weight']);
-      await insertQuery;
+        .onConflict(['session_id', 'exercise_id', 'set_number'])
+        .merge(['actual_reps', 'actual_weight']);
     }
 
     const updatedSets = await knex('session_sets')

@@ -19,10 +19,14 @@ router.post('/', async (req, res, next) => {
     const body = validate(createSessionSchema, req.body);
     const knex = getKnex();
 
+    const startedAt = (body.started_at ? dayjs(body.started_at) : dayjs())
+      .utc()
+      .format('YYYY-MM-DD HH:mm:ss');
+
     const [sessionId] = await knex('sessions').insert({
       profile_id: body.profile_id,
       workout_id: body.workout_id,
-      started_at: body.started_at || dayjs().utc().toISOString(),
+      started_at: startedAt,
       notes: body.notes || null,
     });
 
@@ -94,10 +98,14 @@ router.post('/:id/finish', async (req, res, next) => {
 
     const body = validate(finishSchema, req.body ?? {});
     const knex = getKnex();
+    const endedAt = (body.ended_at ? dayjs(body.ended_at) : dayjs())
+      .utc()
+      .format('YYYY-MM-DD HH:mm:ss');
+
     const updated = await knex('sessions')
       .where({ id: sessionId })
       .update({
-        ended_at: body.ended_at || dayjs().utc().toISOString(),
+        ended_at: endedAt,
         notes: body.notes ?? null,
       });
 

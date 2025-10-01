@@ -2,6 +2,7 @@ const express = require('express');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const cors = require('cors');
+const fs = require('fs');
 const path = require('path');
 const routes = require('./routes');
 const { notFound, errorHandler } = require('./utils/errors');
@@ -30,13 +31,22 @@ app.use('/api/v1', routes);
 
 // Serve frontend build if available
 const frontendDir = path.resolve(__dirname, '..', 'public');
+const indexHtmlPath = path.join(frontendDir, 'index.html');
 app.use(express.static(frontendDir));
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api/')) {
-    return next();
-  }
-  res.sendFile(path.join(frontendDir, 'index.html'));
-});
+
+if (fs.existsSync(indexHtmlPath)) {
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' || req.path.startsWith('/api/')) {
+      return next();
+    }
+
+    return res.sendFile(indexHtmlPath);
+  });
+} else {
+  console.warn(
+    'SPA index.html not found in public directory; skipping frontend fallback.'
+  );
+}
 
 app.use(notFound);
 app.use(errorHandler);

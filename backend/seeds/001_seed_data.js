@@ -217,8 +217,20 @@ async function seedDemoSessions(knex, profileId, weekStart) {
     return;
   }
 
-  const startedAt = weekStart.subtract(3, 'day').hour(17).minute(0).second(0).utc().toISOString();
-  const endedAt = weekStart.subtract(3, 'day').hour(18).minute(0).second(0).utc().toISOString();
+  const startedAt = weekStart
+    .subtract(3, 'day')
+    .hour(17)
+    .minute(0)
+    .second(0)
+    .utc()
+    .format('YYYY-MM-DD HH:mm:ss');
+  const endedAt = weekStart
+    .subtract(3, 'day')
+    .hour(18)
+    .minute(0)
+    .second(0)
+    .utc()
+    .format('YYYY-MM-DD HH:mm:ss');
 
   const [sessionId] = await knex('sessions').insert({
     profile_id: profileId,

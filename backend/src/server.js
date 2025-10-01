@@ -31,12 +31,11 @@ app.use('/api/v1', routes);
 // Serve frontend build if available
 const frontendDir = path.resolve(__dirname, '..', 'public');
 app.use(express.static(frontendDir));
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api/')) {
-    return next();
-  }
+// Only match GETs that do NOT start with /api/
+app.get(/^\/(?!api\/).*/, (req, res) => {
   res.sendFile(path.join(frontendDir, 'index.html'));
 });
+
 
 app.use(notFound);
 app.use(errorHandler);

@@ -31,8 +31,8 @@ app.use('/api/v1', routes);
 // Serve frontend build if available
 const frontendDir = path.resolve(__dirname, '..', 'public');
 app.use(express.static(frontendDir));
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api/')) {
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/') || req.method !== 'GET') {
     return next();
   }
   res.sendFile(path.join(frontendDir, 'index.html'));

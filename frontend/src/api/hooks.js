@@ -1,0 +1,133 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from './client';
+
+export function useProfiles() {
+  return useQuery({
+    queryKey: ['profiles'],
+    queryFn: () => apiRequest('/profiles'),
+  });
+}
+
+export function useProfileSummary(profileId) {
+  return useQuery({
+    queryKey: ['profile-summary', profileId],
+    queryFn: () => apiRequest(`/profiles/${profileId}/summary`),
+    enabled: Boolean(profileId),
+  });
+}
+
+export function useWeekPlan(profileId, weekStart) {
+  return useQuery({
+    queryKey: ['week-plan', profileId, weekStart],
+    queryFn: () =>
+      apiRequest(`/profiles/${profileId}/week?start=${encodeURIComponent(weekStart)}`),
+    enabled: Boolean(profileId && weekStart),
+  });
+}
+
+export function useSessions(profileId, range) {
+  const searchParams = new URLSearchParams(range);
+  return useQuery({
+    queryKey: ['sessions', profileId, searchParams.toString()],
+    queryFn: () => apiRequest(`/profiles/${profileId}/sessions?${searchParams}`),
+    enabled: Boolean(profileId),
+  });
+}
+
+export function useWorkout(workoutId) {
+  return useQuery({
+    queryKey: ['workout', workoutId],
+    queryFn: () => apiRequest(`/workouts/${workoutId}`),
+    enabled: Boolean(workoutId),
+  });
+}
+
+export function useStatsOverview(profileId, weeks) {
+  return useQuery({
+    queryKey: ['stats-overview', profileId, weeks],
+    queryFn: () => apiRequest(`/stats/profiles/${profileId}/overview?window=weeks:${weeks}`),
+    enabled: Boolean(profileId),
+  });
+}
+
+export function useVolumeTrend(profileId, weeks) {
+  return useQuery({
+    queryKey: ['stats-volume', profileId, weeks],
+    queryFn: () => apiRequest(`/stats/profiles/${profileId}/volume?granularity=week&weeks=${weeks}`),
+    enabled: Boolean(profileId),
+  });
+}
+
+export function useSetsPerMuscle(profileId, weeks) {
+  return useQuery({
+    queryKey: ['stats-sets-muscle', profileId, weeks],
+    queryFn: () => apiRequest(`/stats/profiles/${profileId}/sets-per-muscle?weeks=${weeks}`),
+    enabled: Boolean(profileId),
+  });
+}
+
+export function useIntensityDistribution(profileId, weeks) {
+  return useQuery({
+    queryKey: ['stats-intensity', profileId, weeks],
+    queryFn: () => apiRequest(`/stats/profiles/${profileId}/intensity?weeks=${weeks}`),
+    enabled: Boolean(profileId),
+  });
+}
+
+export function useExerciseE1RM(profileId, exerciseId, weeks) {
+  return useQuery({
+    queryKey: ['stats-e1rm', profileId, exerciseId, weeks],
+    queryFn: () => apiRequest(`/stats/profiles/${profileId}/e1rm?exercise_id=${exerciseId}&weeks=${weeks}`),
+    enabled: Boolean(profileId && exerciseId),
+  });
+}
+
+export function useStartSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload) => apiRequest('/sessions', { method: 'POST', body: payload }),
+    onSuccess: (_data, variables) => {
+      if (variables?.profile_id) {
+        queryClient.invalidateQueries({ queryKey: ['sessions', variables.profile_id] });
+      }
+    },
+  });
+}
+
+export function useSaveSessionSets(sessionId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload) => {
+      const id = payload.sessionId ?? sessionId;
+      if (!id) {
+        throw new Error('Session not ready');
+      }
+      const body = { ...payload };
+      delete body.sessionId;
+      return apiRequest(`/sessions/${id}/sets/bulk`, { method: 'POST', body });
+    },
+    onSuccess: (_data, variables) => {
+      const id = variables.sessionId ?? sessionId;
+      if (id) {
+        queryClient.invalidateQueries({ queryKey: ['session-sets', id] });
+      }
+    },
+  });
+}
+
+export function useFinishSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionId, body }) =>
+      apiRequest(`/sessions/${sessionId}/finish`, { method: 'POST', body }),
+    onSuccess: (data, variables) => {
+      if (variables?.profileId) {
+        queryClient.invalidateQueries({ queryKey: ['profile-summary', variables.profileId] });
+        queryClient.invalidateQueries({ queryKey: ['stats-overview', variables.profileId] });
+        queryClient.invalidateQueries({ queryKey: ['stats-volume', variables.profileId] });
+        queryClient.invalidateQueries({ queryKey: ['stats-sets-muscle', variables.profileId] });
+        queryClient.invalidateQueries({ queryKey: ['stats-intensity', variables.profileId] });
+      }
+    },
+  });
+}

@@ -1,0 +1,47 @@
+version: '3.9'
+
+services:
+  db:
+    image: mariadb:10.11
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: workouts
+      MYSQL_USER: app
+      MYSQL_PASSWORD: app_pass
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+  api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: app
+      DB_PASSWORD: app_pass
+      DB_NAME: workouts
+      CORS_ORIGIN: http://localhost:3000
+    ports:
+      - "3001:3001"
+
+  web:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      VITE_API_URL: http://api:3001/api/v1
+    ports:
+      - "3000:3000"
+
+volumes:
+  db_data:

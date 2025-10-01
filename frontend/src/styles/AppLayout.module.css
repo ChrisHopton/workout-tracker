@@ -1,0 +1,53 @@
+.appShell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 24px 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(12px);
+  background: rgba(248, 250, 252, 0.8);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.headerContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: min(1100px, 92vw);
+  margin: 0 auto;
+}
+
+.brand {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #0f172a;
+}
+
+.tagline {
+  font-size: 0.95rem;
+  color: #475569;
+  margin-top: 4px;
+}
+
+main {
+  flex: 1;
+  padding: 32px 0 64px;
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 18px 0;
+  }
+  main {
+    padding: 24px 0 48px;
+  }
+  .brand {
+    font-size: 1.1rem;
+  }
+}

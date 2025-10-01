@@ -1,0 +1,115 @@
+const express = require('express');
+const { z } = require('zod');
+const dayjs = require('../utils/dayjs');
+const { getKnex } = require('../db/knex');
+const { validate } = require('../utils/validation');
+const { createHttpError } = require('../utils/errors');
+
+const router = express.Router();
+
+const createSessionSchema = z.object({
+  profile_id: z.number().int().positive(),
+  workout_id: z.number().int().positive(),
+  started_at: z.string().datetime().optional(),
+  notes: z.string().optional(),
+});
+
+router.post('/', async (req, res, next) => {
+  try {
+    const body = validate(createSessionSchema, req.body);
+    const knex = getKnex();
+
+    const [sessionId] = await knex('sessions').insert({
+      profile_id: body.profile_id,
+      workout_id: body.workout_id,
+      started_at: body.started_at || dayjs().utc().toISOString(),
+      notes: body.notes || null,
+    });
+
+    const session = await knex('sessions').where({ id: sessionId }).first();
+    res.status(201).json({ data: session });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const setSchema = z.object({
+  exercise_id: z.number().int().positive(),
+  set_number: z.number().int().positive(),
+  actual_reps: z.number().int().positive().nullable(),
+  actual_weight: z.number().nonnegative().nullable(),
+});
+
+router.post('/:id/sets/bulk', async (req, res, next) => {
+  try {
+    const sessionId = Number(req.params.id);
+    if (!sessionId) {
+      throw createHttpError(400, 'Invalid session id');
+    }
+    const knex = getKnex();
+    const session = await knex('sessions').where({ id: sessionId }).first();
+    if (!session) {
+      throw createHttpError(404, 'Session not found');
+    }
+
+    const payloadSchema = z.object({ sets: z.array(setSchema).min(1) });
+    const body = validate(payloadSchema, req.body);
+
+    const rows = body.sets.map((set) => ({
+      session_id: sessionId,
+      exercise_id: set.exercise_id,
+      set_number: set.set_number,
+      actual_reps: set.actual_reps ?? null,
+      actual_weight: set.actual_weight ?? null,
+    }));
+
+    if (rows.length) {
+      const insertQuery = knex('session_sets')
+        .insert(rows)
+        .onDuplicateUpdate(['actual_reps', 'actual_weight']);
+      await insertQuery;
+    }
+
+    const updatedSets = await knex('session_sets')
+      .where({ session_id: sessionId })
+      .orderBy(['exercise_id', 'set_number']);
+
+    res.json({ data: updatedSets });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const finishSchema = z.object({
+  ended_at: z.string().datetime().optional(),
+  notes: z.string().optional(),
+});
+
+router.post('/:id/finish', async (req, res, next) => {
+  try {
+    const sessionId = Number(req.params.id);
+    if (!sessionId) {
+      throw createHttpError(400, 'Invalid session id');
+    }
+
+    const body = validate(finishSchema, req.body ?? {});
+    const knex = getKnex();
+    const updated = await knex('sessions')
+      .where({ id: sessionId })
+      .update({
+        ended_at: body.ended_at || dayjs().utc().toISOString(),
+        notes: body.notes ?? null,
+      });
+
+    if (!updated) {
+      throw createHttpError(404, 'Session not found');
+    }
+
+    const session = await knex('sessions').where({ id: sessionId }).first();
+    res.json({ data: session });
+  } catch (error) {
+    next(error);
+  }
+});
+
+module.exports = router;

@@ -1,0 +1,144 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 2.8vw, 2.4rem);
+}
+
+.header p {
+  margin: 6px 0 0;
+  color: #475569;
+  max-width: 520px;
+}
+
+.kpiBubble {
+  min-width: 180px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.04));
+  border-radius: 18px;
+  padding: 16px 20px;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  box-shadow: 0 18px 40px -28px rgba(37, 99, 235, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.summaryStrip {
+  margin-top: 28px;
+  padding: 18px;
+  border-radius: 20px;
+  background: #ffffff;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: center;
+}
+
+.summaryLabel {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+}
+
+.summaryStrip strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.25rem;
+}
+
+.weekControls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.weekControls button {
+  background: #1d4ed8;
+  color: #ffffff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.weekControls span {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.tabs {
+  margin-top: 32px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tabs button {
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 999px;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.tabs button:hover {
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.tabs .active,
+.tabs button.active,
+.active {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.05));
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.contentSection {
+  margin-top: 28px;
+  min-height: 200px;
+}
+
+.loading {
+  padding: 24px;
+  text-align: center;
+  color: #64748b;
+}
+
+.startButton {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  background: linear-gradient(135deg, #2563eb, #9333ea);
+  color: #ffffff;
+  border: none;
+  padding: 16px 28px;
+  border-radius: 999px;
+  font-size: 1rem;
+  font-weight: 600;
+  box-shadow: 0 30px 60px -40px rgba(79, 70, 229, 0.8);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.startButton:hover {
+  transform: translateY(-4px);
+}
+
+@media (max-width: 768px) {
+  .startButton {
+    right: 20px;
+    bottom: 20px;
+    padding: 14px 22px;
+  }
+}

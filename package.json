@@ -1,0 +1,11 @@
+{
+  "name": "hypertrophy-workout-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Full-stack hypertrophy workout tracker",
+  "scripts": {
+    "dev:api": "npm --prefix backend run dev",
+    "dev:web": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build"
+  }
+}

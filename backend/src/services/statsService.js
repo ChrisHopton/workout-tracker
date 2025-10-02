@@ -1,5 +1,6 @@
 const dayjs = require('../utils/dayjs');
 const { getKnex } = require('../db/knex');
+const { toSqlDateTime } = require('../utils/sql');
 
 function getWeekWindow(weeks = 4) {
   const safeWeeks = Math.max(1, Number(weeks) || 1);
@@ -15,7 +16,7 @@ async function getOverview(profileId, weeks = 4) {
   const tonnageRow = await knex('session_sets as ss')
     .join('sessions as s', 'ss.session_id', 's.id')
     .where('s.profile_id', profileId)
-    .whereBetween('s.started_at', [start.toISOString(), end.toISOString()])
+    .whereBetween('s.started_at', [toSqlDateTime(start), toSqlDateTime(end)])
     .whereNotNull('ss.actual_reps')
     .whereNotNull('ss.actual_weight')
     .sum({ tonnage: knex.raw('ss.actual_reps * ss.actual_weight') })
@@ -24,7 +25,7 @@ async function getOverview(profileId, weeks = 4) {
   const completedSetsRow = await knex('session_sets as ss')
     .join('sessions as s', 'ss.session_id', 's.id')
     .where('s.profile_id', profileId)
-    .whereBetween('s.started_at', [start.toISOString(), end.toISOString()])
+    .whereBetween('s.started_at', [toSqlDateTime(start), toSqlDateTime(end)])
     .whereNotNull('ss.actual_reps')
     .whereNotNull('ss.actual_weight')
     .count({ count: '*' })
@@ -35,7 +36,7 @@ async function getOverview(profileId, weeks = 4) {
     .join('workout_exercises as we', 'we.workout_id', 'w.id')
     .join('prescriptions as p', 'p.workout_exercise_id', 'we.id')
     .where('s.profile_id', profileId)
-    .whereBetween('s.started_at', [start.toISOString(), end.toISOString()])
+    .whereBetween('s.started_at', [toSqlDateTime(start), toSqlDateTime(end)])
     .count({ count: 'p.id' })
     .first();
 
@@ -43,7 +44,7 @@ async function getOverview(profileId, weeks = 4) {
     .join('sessions as s', 'ss.session_id', 's.id')
     .join('exercises as e', 'ss.exercise_id', 'e.id')
     .where('s.profile_id', profileId)
-    .whereBetween('s.started_at', [start.toISOString(), end.toISOString()])
+    .whereBetween('s.started_at', [toSqlDateTime(start), toSqlDateTime(end)])
     .whereNotNull('ss.actual_reps')
     .whereNotNull('ss.actual_weight')
     .select(
@@ -78,7 +79,7 @@ async function getVolumeTrend(profileId, weeks = 12) {
   const rows = await knex('session_sets as ss')
     .join('sessions as s', 'ss.session_id', 's.id')
     .where('s.profile_id', profileId)
-    .whereBetween('s.started_at', [start.toISOString(), end.toISOString()])
+    .whereBetween('s.started_at', [toSqlDateTime(start), toSqlDateTime(end)])
     .whereNotNull('ss.actual_reps')
     .whereNotNull('ss.actual_weight')
     .select({
@@ -103,11 +104,11 @@ async function getExerciseE1RM(profileId, exerciseId, weeks = 12) {
     .join('sessions as s', 'ss.session_id', 's.id')
     .where('s.profile_id', profileId)
     .where('ss.exercise_id', exerciseId)
-    .whereBetween('s.started_at', [start.toISOString(), end.toISOString()])
+    .whereBetween('s.started_at', [toSqlDateTime(start), toSqlDateTime(end)])
     .whereNotNull('ss.actual_reps')
     .whereNotNull('ss.actual_weight')
     .select({
-      performed_at: knex.raw('DATE(s.started_at) as performed_at'),
+      performed_at: knex.raw('DATE(s.started_at)'),
       e1rm: knex.raw('MAX(ss.actual_weight * (1 + ss.actual_reps / 30))'),
     })
     .groupBy(knex.raw('DATE(s.started_at)'))
@@ -126,7 +127,7 @@ async function getSetsPerMuscle(profileId, weeks = 8) {
     .join('sessions as s', 'ss.session_id', 's.id')
     .join('exercises as e', 'ss.exercise_id', 'e.id')
     .where('s.profile_id', profileId)
-    .whereBetween('s.started_at', [start.toISOString(), end.toISOString()])
+    .whereBetween('s.started_at', [toSqlDateTime(start), toSqlDateTime(end)])
     .whereNotNull('ss.actual_reps')
     .whereNotNull('ss.actual_weight')
     .select('e.muscle_group')
@@ -146,7 +147,7 @@ async function getIntensityDistribution(profileId, weeks = 8) {
   const rows = await knex('session_sets as ss')
     .join('sessions as s', 'ss.session_id', 's.id')
     .where('s.profile_id', profileId)
-    .whereBetween('s.started_at', [start.toISOString(), end.toISOString()])
+    .whereBetween('s.started_at', [toSqlDateTime(start), toSqlDateTime(end)])
     .whereNotNull('ss.actual_reps')
     .whereNotNull('ss.actual_weight')
     .select('ss.actual_reps');

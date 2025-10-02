@@ -4,8 +4,39 @@ const dayjs = require('../utils/dayjs');
 const { getKnex } = require('../db/knex');
 const { validate } = require('../utils/validation');
 const { createHttpError } = require('../utils/errors');
+const { toSqlDateTime } = require('../utils/sql');
 
 const router = express.Router();
+
+const parseRequiredNumber = (value) => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return value;
+    }
+    const parsed = Number(trimmed);
+    return Number.isNaN(parsed) ? value : parsed;
+  }
+  return value;
+};
+
+const parseOptionalNumber = (value) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    const parsed = Number(trimmed);
+    return Number.isNaN(parsed) ? value : parsed;
+  }
+  if (typeof value === 'number') {
+    return value;
+  }
+  return value;
+};
 
 const createSessionSchema = z.object({
   profile_id: z.number().int().positive(),
@@ -14,15 +45,72 @@ const createSessionSchema = z.object({
   notes: z.string().optional(),
 });
 
+const sessionLookupSchema = z.object({
+  profile_id: z.preprocess(parseRequiredNumber, z.number().int().positive()),
+  workout_id: z.preprocess(parseRequiredNumber, z.number().int().positive()),
+  scheduled_for: z.string().optional(),
+});
+
+router.get('/lookup', async (req, res, next) => {
+  try {
+    const params = validate(sessionLookupSchema, req.query);
+    const knex = getKnex();
+
+    const query = knex('sessions as s')
+      .where('s.profile_id', params.profile_id)
+      .where('s.workout_id', params.workout_id)
+      .orderBy('s.started_at', 'desc');
+
+    if (params.scheduled_for) {
+      const day = dayjs(params.scheduled_for).utc();
+      if (!day.isValid()) {
+        throw createHttpError(400, 'Invalid scheduled date');
+      }
+      query.whereBetween('s.started_at', [
+        toSqlDateTime(day.startOf('day')),
+        toSqlDateTime(day.endOf('day')),
+      ]);
+    }
+
+    const session = await query.first();
+
+    if (!session) {
+      res.json({ data: null });
+      return;
+    }
+
+    const sets = await knex('session_sets')
+      .where({ session_id: session.id })
+      .orderBy(['exercise_id', 'set_number']);
+
+    const normalizedSets = sets.map((set) => ({
+      ...set,
+      actual_reps: set.actual_reps !== null ? Number(set.actual_reps) : null,
+      actual_weight: set.actual_weight !== null ? Number(set.actual_weight) : null,
+    }));
+
+    res.json({
+      data: {
+        ...session,
+        sets: normalizedSets,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/', async (req, res, next) => {
   try {
     const body = validate(createSessionSchema, req.body);
     const knex = getKnex();
 
+    const startedAt = toSqlDateTime(body.started_at ? dayjs(body.started_at) : dayjs());
+
     const [sessionId] = await knex('sessions').insert({
       profile_id: body.profile_id,
       workout_id: body.workout_id,
-      started_at: body.started_at || dayjs().utc().toISOString(),
+      started_at: startedAt,
       notes: body.notes || null,
     });
 
@@ -33,11 +121,52 @@ router.post('/', async (req, res, next) => {
   }
 });
 
+router.get('/:id/sets', async (req, res, next) => {
+  try {
+    const sessionId = Number(req.params.id);
+    if (!sessionId) {
+      throw createHttpError(400, 'Invalid session id');
+    }
+    const knex = getKnex();
+    const session = await knex('sessions').where({ id: sessionId }).first();
+    if (!session) {
+      throw createHttpError(404, 'Session not found');
+    }
+
+    const sets = await knex('session_sets')
+      .where({ session_id: sessionId })
+      .orderBy(['exercise_id', 'set_number']);
+
+    const normalizedSets = sets.map((set) => ({
+      ...set,
+      actual_reps: set.actual_reps !== null ? Number(set.actual_reps) : null,
+      actual_weight: set.actual_weight !== null ? Number(set.actual_weight) : null,
+    }));
+
+    res.json({ data: normalizedSets });
+  } catch (error) {
+    next(error);
+  }
+});
+
 const setSchema = z.object({
-  exercise_id: z.number().int().positive(),
-  set_number: z.number().int().positive(),
-  actual_reps: z.number().int().positive().nullable(),
-  actual_weight: z.number().nonnegative().nullable(),
+  exercise_id: z.preprocess(
+    parseRequiredNumber,
+    z.number().int().positive()
+  ),
+  set_number: z.preprocess(parseRequiredNumber, z.number().int().positive()),
+  actual_reps: z
+    .preprocess(
+      parseOptionalNumber,
+      z.union([z.number().int().min(0), z.null()])
+    )
+    .transform((value) => (value ?? null)),
+  actual_weight: z
+    .preprocess(
+      parseOptionalNumber,
+      z.union([z.number().min(0), z.null()])
+    )
+    .transform((value) => (value ?? null)),
 });
 
 router.post('/:id/sets/bulk', async (req, res, next) => {
@@ -64,17 +193,44 @@ router.post('/:id/sets/bulk', async (req, res, next) => {
     }));
 
     if (rows.length) {
-      const insertQuery = knex('session_sets')
-        .insert(rows)
-        .onDuplicateUpdate(['actual_reps', 'actual_weight']);
-      await insertQuery;
+      const groupedByExercise = rows.reduce((map, row) => {
+        const rowsForExercise = map.get(row.exercise_id) || [];
+        rowsForExercise.push(row);
+        map.set(row.exercise_id, rowsForExercise);
+        return map;
+      }, new Map());
+
+      await knex.transaction(async (trx) => {
+        for (const [exerciseId, exerciseRows] of groupedByExercise.entries()) {
+          await trx('session_sets')
+            .where({ session_id: sessionId, exercise_id: exerciseId })
+            .del();
+
+          if (exerciseRows.length) {
+            const timestamp = trx.fn.now();
+            await trx('session_sets').insert(
+              exerciseRows.map((row) => ({
+                ...row,
+                created_at: timestamp,
+                updated_at: timestamp,
+              }))
+            );
+          }
+        }
+      });
     }
 
     const updatedSets = await knex('session_sets')
       .where({ session_id: sessionId })
       .orderBy(['exercise_id', 'set_number']);
 
-    res.json({ data: updatedSets });
+    const normalizedSets = updatedSets.map((set) => ({
+      ...set,
+      actual_reps: set.actual_reps !== null ? Number(set.actual_reps) : null,
+      actual_weight: set.actual_weight !== null ? Number(set.actual_weight) : null,
+    }));
+
+    res.json({ data: normalizedSets });
   } catch (error) {
     next(error);
   }
@@ -94,10 +250,12 @@ router.post('/:id/finish', async (req, res, next) => {
 
     const body = validate(finishSchema, req.body ?? {});
     const knex = getKnex();
+    const endedAt = toSqlDateTime(body.ended_at ? dayjs(body.ended_at) : dayjs());
+
     const updated = await knex('sessions')
       .where({ id: sessionId })
       .update({
-        ended_at: body.ended_at || dayjs().utc().toISOString(),
+        ended_at: endedAt,
         notes: body.notes ?? null,
       });
 

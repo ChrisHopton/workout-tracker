@@ -2,6 +2,7 @@ const express = require('express');
 const dayjs = require('../utils/dayjs');
 const { getKnex } = require('../db/knex');
 const { createHttpError } = require('../utils/errors');
+const { toSqlDateTime } = require('../utils/sql');
 
 const router = express.Router();
 
@@ -143,7 +144,7 @@ router.get('/:id/sessions', async (req, res, next) => {
     const sessions = await knex('sessions as s')
       .leftJoin('workouts as w', 's.workout_id', 'w.id')
       .where('s.profile_id', profileId)
-      .whereBetween('s.started_at', [from.toISOString(), to.toISOString()])
+      .whereBetween('s.started_at', [toSqlDateTime(from), toSqlDateTime(to)])
       .select(
         's.id',
         's.started_at',
@@ -184,7 +185,7 @@ router.get('/:id/summary', async (req, res, next) => {
     const tonnageRow = await knex('session_sets as ss')
       .join('sessions as s', 'ss.session_id', 's.id')
       .where('s.profile_id', profileId)
-      .whereBetween('s.started_at', [start.toISOString(), end.toISOString()])
+      .whereBetween('s.started_at', [toSqlDateTime(start), toSqlDateTime(end)])
       .whereNotNull('ss.actual_reps')
       .whereNotNull('ss.actual_weight')
       .sum({ tonnage: knex.raw('ss.actual_reps * ss.actual_weight') })
@@ -193,7 +194,7 @@ router.get('/:id/summary', async (req, res, next) => {
     const completedSetsRow = await knex('session_sets as ss')
       .join('sessions as s', 'ss.session_id', 's.id')
       .where('s.profile_id', profileId)
-      .whereBetween('s.started_at', [start.toISOString(), end.toISOString()])
+      .whereBetween('s.started_at', [toSqlDateTime(start), toSqlDateTime(end)])
       .whereNotNull('ss.actual_reps')
       .whereNotNull('ss.actual_weight')
       .count({ count: '*' })
@@ -204,7 +205,7 @@ router.get('/:id/summary', async (req, res, next) => {
       .join('workout_exercises as we', 'we.workout_id', 'w.id')
       .join('prescriptions as p', 'p.workout_exercise_id', 'we.id')
       .where('s.profile_id', profileId)
-      .whereBetween('s.started_at', [start.toISOString(), end.toISOString()])
+      .whereBetween('s.started_at', [toSqlDateTime(start), toSqlDateTime(end)])
       .count({ count: 'p.id' })
       .first();
 

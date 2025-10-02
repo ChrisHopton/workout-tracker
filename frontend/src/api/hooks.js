@@ -42,6 +42,23 @@ export function useWorkout(workoutId) {
   });
 }
 
+export function useSessionLookup(profileId, workoutId, scheduledFor) {
+  return useQuery({
+    queryKey: ['session-lookup', profileId, workoutId, scheduledFor || null],
+    queryFn: () => {
+      const params = new URLSearchParams({
+        profile_id: profileId,
+        workout_id: workoutId,
+      });
+      if (scheduledFor) {
+        params.set('scheduled_for', scheduledFor);
+      }
+      return apiRequest(`/sessions/lookup?${params.toString()}`);
+    },
+    enabled: Boolean(profileId && workoutId),
+  });
+}
+
 export function useStatsOverview(profileId, weeks) {
   return useQuery({
     queryKey: ['stats-overview', profileId, weeks],

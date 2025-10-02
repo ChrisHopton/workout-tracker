@@ -107,9 +107,15 @@ function StartWorkoutPage() {
       existingSession?.id
     )
       return;
+    const now = dayjs();
     const startedAt = scheduledDate
-      ? dayjs(`${scheduledDate}T${dayjs().format('HH:mm:ss')}`).toISOString()
-      : dayjs().toISOString();
+      ? dayjs(`${scheduledDate}T${now.format('HH:mm:ss')}`).utc(true).toISOString()
+      : now.toISOString();
+    console.log('[StartWorkoutPage] starting session', {
+      scheduledDate,
+      localTime: now.format(),
+      startedAt,
+    });
     startSession.mutate(
       {
         profile_id: Number(profileId),

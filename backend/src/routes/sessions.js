@@ -111,10 +111,24 @@ router.post('/:id/sets/bulk', async (req, res, next) => {
     }));
 
     if (rows.length) {
-      await knex('session_sets')
-        .insert(rows)
-        .onConflict(['session_id', 'exercise_id', 'set_number'])
-        .merge(['actual_reps', 'actual_weight']);
+      await knex.transaction(async (trx) => {
+        for (const row of rows) {
+          const updated = await trx('session_sets')
+            .where({
+              session_id: row.session_id,
+              exercise_id: row.exercise_id,
+              set_number: row.set_number,
+            })
+            .update({
+              actual_reps: row.actual_reps,
+              actual_weight: row.actual_weight,
+            });
+
+          if (!updated) {
+            await trx('session_sets').insert(row);
+          }
+        }
+      });
     }
 
     const updatedSets = await knex('session_sets')

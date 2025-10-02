@@ -107,7 +107,7 @@ async function getExerciseE1RM(profileId, exerciseId, weeks = 12) {
     .whereNotNull('ss.actual_reps')
     .whereNotNull('ss.actual_weight')
     .select({
-      performed_at: knex.raw('DATE(s.started_at) as performed_at'),
+      performed_at: knex.raw('DATE(s.started_at)'),
       e1rm: knex.raw('MAX(ss.actual_weight * (1 + ss.actual_reps / 30))'),
     })
     .groupBy(knex.raw('DATE(s.started_at)'))

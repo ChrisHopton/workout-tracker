@@ -1,20 +1,12 @@
-const express = require('express');
-const profilesRouter = require('./profiles');
-const workoutsRouter = require('./workouts');
-const sessionsRouter = require('./sessions');
-const statsRouter = require('./stats');
-const exercisesRouter = require('./exercises');
+const { Router } = require('express');
+const userRoutes = require('../modules/users/user.routes');
+const exerciseRoutes = require('../modules/exercises/exercise.routes');
+const workoutRoutes = require('../modules/workouts/workout.routes');
 
-const router = express.Router();
+const router = Router();
 
-router.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
-router.use('/profiles', profilesRouter);
-router.use('/workouts', workoutsRouter);
-router.use('/sessions', sessionsRouter);
-router.use('/stats', statsRouter);
-router.use('/exercises', exercisesRouter);
+router.use('/users', userRoutes);
+router.use('/exercises', exerciseRoutes);
+router.use('/workouts', workoutRoutes);
 
 module.exports = router;

@@ -104,8 +104,12 @@ export function useStartSession() {
   return useMutation({
     mutationFn: (payload) => apiRequest('/sessions', { method: 'POST', body: payload }),
     onSuccess: (_data, variables) => {
-      if (variables?.profile_id) {
-        queryClient.invalidateQueries({ queryKey: ['sessions', variables.profile_id] });
+      const profileKey = variables?.profile_id != null ? String(variables.profile_id) : null;
+      if (profileKey) {
+        console.log('[useStartSession] created session, invalidating sessions query', {
+          profileId: profileKey,
+        });
+        queryClient.invalidateQueries({ queryKey: ['sessions', profileKey] });
       }
     },
   });
@@ -127,17 +131,33 @@ export function useSaveSessionSets(sessionId, profileId) {
     onSuccess: (_data, variables) => {
       const id = variables.sessionId ?? sessionId;
       if (id) {
+        console.log('[useSaveSessionSets] saved sets for session, invalidating cache', {
+          sessionId: id,
+        });
         queryClient.invalidateQueries({ queryKey: ['session-sets', id] });
       }
       const profileKey = variables.profileId ?? profileId;
-      if (profileKey) {
-        queryClient.invalidateQueries({ queryKey: ['profile-summary', profileKey] });
-        queryClient.invalidateQueries({ queryKey: ['stats-overview', profileKey] });
-        queryClient.invalidateQueries({ queryKey: ['stats-volume', profileKey] });
-        queryClient.invalidateQueries({ queryKey: ['stats-sets-muscle', profileKey] });
-        queryClient.invalidateQueries({ queryKey: ['stats-intensity', profileKey] });
-        queryClient.invalidateQueries({ queryKey: ['stats-e1rm', profileKey] });
+      const normalizedProfileKey = profileKey != null ? String(profileKey) : null;
+      if (normalizedProfileKey) {
+        console.log('[useSaveSessionSets] invalidating stats for profile', {
+          profileId: normalizedProfileKey,
+        });
+        queryClient.invalidateQueries({ queryKey: ['profile-summary', normalizedProfileKey] });
+        queryClient.invalidateQueries({ queryKey: ['stats-overview', normalizedProfileKey] });
+        queryClient.invalidateQueries({ queryKey: ['stats-volume', normalizedProfileKey] });
+        queryClient.invalidateQueries({ queryKey: ['stats-sets-muscle', normalizedProfileKey] });
+        queryClient.invalidateQueries({ queryKey: ['stats-intensity', normalizedProfileKey] });
+        queryClient.invalidateQueries({ queryKey: ['stats-e1rm', normalizedProfileKey] });
       }
+    },
+    onError: (error, variables) => {
+      const id = variables?.sessionId ?? sessionId;
+      const profileKey = variables?.profileId ?? profileId;
+      console.error('[useSaveSessionSets] failed to save session sets', {
+        sessionId: id,
+        profileId: profileKey != null ? String(profileKey) : null,
+        message: error?.message,
+      });
     },
   });
 }
@@ -148,13 +168,18 @@ export function useFinishSession() {
     mutationFn: ({ sessionId, body }) =>
       apiRequest(`/sessions/${sessionId}/finish`, { method: 'POST', body }),
     onSuccess: (data, variables) => {
-      if (variables?.profileId) {
-        queryClient.invalidateQueries({ queryKey: ['profile-summary', variables.profileId] });
-        queryClient.invalidateQueries({ queryKey: ['stats-overview', variables.profileId] });
-        queryClient.invalidateQueries({ queryKey: ['stats-volume', variables.profileId] });
-        queryClient.invalidateQueries({ queryKey: ['stats-sets-muscle', variables.profileId] });
-        queryClient.invalidateQueries({ queryKey: ['stats-intensity', variables.profileId] });
-        queryClient.invalidateQueries({ queryKey: ['stats-e1rm', variables.profileId] });
+      const profileKey = variables?.profileId != null ? String(variables.profileId) : null;
+      if (profileKey) {
+        console.log('[useFinishSession] finished session, invalidating stats', {
+          sessionId: variables?.sessionId,
+          profileId: profileKey,
+        });
+        queryClient.invalidateQueries({ queryKey: ['profile-summary', profileKey] });
+        queryClient.invalidateQueries({ queryKey: ['stats-overview', profileKey] });
+        queryClient.invalidateQueries({ queryKey: ['stats-volume', profileKey] });
+        queryClient.invalidateQueries({ queryKey: ['stats-sets-muscle', profileKey] });
+        queryClient.invalidateQueries({ queryKey: ['stats-intensity', profileKey] });
+        queryClient.invalidateQueries({ queryKey: ['stats-e1rm', profileKey] });
       }
     },
   });

@@ -74,11 +74,11 @@ function StartWorkoutPage() {
   const [sessionId, setSessionId] = useState(null);
   const [exerciseState, setExerciseState] = useState({});
   const initializedSessionRef = useRef(null);
-  const numericProfileId = profileId ? Number(profileId) : undefined;
+  const profileCacheKey = profileId ? String(profileId) : undefined;
 
   const startSession = useStartSession();
   const finishSession = useFinishSession();
-  const saveSessionSets = useSaveSessionSets(sessionId, numericProfileId);
+  const saveSessionSets = useSaveSessionSets(sessionId, profileCacheKey);
 
   useEffect(() => {
     if (!workout || sessionLookup.isLoading) return;
@@ -191,7 +191,13 @@ function StartWorkoutPage() {
     }
 
     try {
-      await saveSessionSets.mutateAsync({ sets: payloadSets, profileId: numericProfileId });
+      console.log('[StartWorkoutPage] saving exercise', {
+        workoutExerciseId: exercise.workout_exercise_id,
+        sessionId,
+        profileId: profileCacheKey,
+        payloadSets,
+      });
+      await saveSessionSets.mutateAsync({ sets: payloadSets, profileId: profileCacheKey });
       setExerciseState((prev) => ({
         ...prev,
         [exercise.workout_exercise_id]: {
@@ -214,7 +220,13 @@ function StartWorkoutPage() {
       actual_weight: null,
     }));
     try {
-      await saveSessionSets.mutateAsync({ sets: payloadSets, profileId: numericProfileId });
+      console.log('[StartWorkoutPage] skipping exercise', {
+        workoutExerciseId: exercise.workout_exercise_id,
+        sessionId,
+        profileId: profileCacheKey,
+        payloadSets,
+      });
+      await saveSessionSets.mutateAsync({ sets: payloadSets, profileId: profileCacheKey });
       setExerciseState((prev) => ({
         ...prev,
         [exercise.workout_exercise_id]: {
@@ -245,8 +257,12 @@ function StartWorkoutPage() {
       notify({ message: 'Please save or skip all exercises before finishing.', variant: 'info' });
       return;
     }
+    console.log('[StartWorkoutPage] finishing session', {
+      sessionId,
+      profileId: profileCacheKey,
+    });
     finishSession.mutate(
-      { sessionId, body: { ended_at: dayjs().toISOString() }, profileId: numericProfileId },
+      { sessionId, body: { ended_at: dayjs().toISOString() }, profileId: profileCacheKey },
       {
         onSuccess: () => {
           notify({ message: 'Workout saved', variant: 'success' });

@@ -1,22 +1,59 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   useWorkout,
   useStartSession,
   useSaveSessionSets,
   useFinishSession,
+  useSessionLookup,
 } from '../api/hooks';
 import { useToast } from '../components/ToastProvider';
 import styles from '../styles/StartWorkout.module.css';
 import dayjs from '../utils/date';
 import { formatDate } from '../utils/format';
 
-function buildInitialState(workout) {
+function groupSetsByExercise(savedSets = []) {
+  return savedSets.reduce((map, set) => {
+    const current = map.get(set.exercise_id) || [];
+    current.push(set);
+    map.set(set.exercise_id, current);
+    return map;
+  }, new Map());
+}
+
+function resolveStatus(savedEntries = []) {
+  if (!savedEntries.length) {
+    return 'idle';
+  }
+  const hasTrackedValue = savedEntries.some(
+    (entry) => entry.actual_reps !== null || entry.actual_weight !== null
+  );
+  return hasTrackedValue ? 'saved' : 'skipped';
+}
+
+function buildInitialState(workout, savedSets = []) {
   const state = {};
+  const setsByExercise = groupSetsByExercise(savedSets);
   workout?.exercises?.forEach((exercise) => {
+    const savedEntries = (setsByExercise.get(exercise.exercise_id) || [])
+      .slice()
+      .sort((a, b) => a.set_number - b.set_number);
+    const inputs = exercise.prescriptions.map((_, idx) => {
+      const saved = savedEntries.find((entry) => entry.set_number === idx + 1);
+      return {
+        reps:
+          saved && saved.actual_reps !== null && saved.actual_reps !== undefined
+            ? String(saved.actual_reps)
+            : '',
+        weight:
+          saved && saved.actual_weight !== null && saved.actual_weight !== undefined
+            ? String(saved.actual_weight)
+            : '',
+      };
+    });
     state[exercise.workout_exercise_id] = {
-      inputs: exercise.prescriptions.map(() => ({ reps: '', weight: '' })),
-      status: 'idle',
+      inputs,
+      status: resolveStatus(savedEntries),
     };
   });
   return state;
@@ -32,19 +69,43 @@ function StartWorkoutPage() {
   const { notify } = useToast();
 
   const { data: workout } = useWorkout(workoutId);
+  const sessionLookup = useSessionLookup(profileId, workoutId, scheduledDate);
+  const existingSession = sessionLookup.data;
   const [sessionId, setSessionId] = useState(null);
   const [exerciseState, setExerciseState] = useState({});
+  const initializedSessionRef = useRef(null);
 
   const startSession = useStartSession();
   const finishSession = useFinishSession();
   const saveSessionSets = useSaveSessionSets(sessionId);
 
   useEffect(() => {
-    setExerciseState(buildInitialState(workout));
-  }, [workout]);
+    if (!workout || sessionLookup.isLoading) return;
+    const sessionKey = `${workout.id || 'workout'}:${scheduledDate || 'unscheduled'}:${existingSession?.id || 'new'}`;
+    if (initializedSessionRef.current === sessionKey) {
+      return;
+    }
+    setExerciseState(buildInitialState(workout, existingSession?.sets || []));
+    initializedSessionRef.current = sessionKey;
+  }, [workout, existingSession, sessionLookup.isLoading, scheduledDate]);
 
   useEffect(() => {
-    if (!workoutId || !profileId || sessionId || startSession.isPending) return;
+    if (existingSession?.id) {
+      setSessionId(existingSession.id);
+    }
+  }, [existingSession]);
+
+  useEffect(() => {
+    if (
+      !workoutId ||
+      !profileId ||
+      sessionId ||
+      startSession.isPending ||
+      sessionLookup.isLoading ||
+      sessionLookup.isFetching ||
+      existingSession?.id
+    )
+      return;
     const startedAt = scheduledDate
       ? dayjs(`${scheduledDate}T${dayjs().format('HH:mm:ss')}`).toISOString()
       : dayjs().toISOString();
@@ -63,7 +124,17 @@ function StartWorkoutPage() {
         },
       }
     );
-  }, [profileId, workoutId, scheduledDate, sessionId, startSession, notify]);
+  }, [
+    profileId,
+    workoutId,
+    scheduledDate,
+    sessionId,
+    startSession,
+    notify,
+    sessionLookup.isLoading,
+    sessionLookup.isFetching,
+    existingSession,
+  ]);
 
   const headerDate = scheduledDate ? formatDate(scheduledDate) : formatDate(new Date());
 

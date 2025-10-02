@@ -111,21 +111,28 @@ router.post('/:id/sets/bulk', async (req, res, next) => {
     }));
 
     if (rows.length) {
-      await knex.transaction(async (trx) => {
-        for (const row of rows) {
-          const updated = await trx('session_sets')
-            .where({
-              session_id: row.session_id,
-              exercise_id: row.exercise_id,
-              set_number: row.set_number,
-            })
-            .update({
-              actual_reps: row.actual_reps,
-              actual_weight: row.actual_weight,
-            });
+      const groupedByExercise = rows.reduce((map, row) => {
+        const rowsForExercise = map.get(row.exercise_id) || [];
+        rowsForExercise.push(row);
+        map.set(row.exercise_id, rowsForExercise);
+        return map;
+      }, new Map());
 
-          if (!updated) {
-            await trx('session_sets').insert(row);
+      await knex.transaction(async (trx) => {
+        for (const [exerciseId, exerciseRows] of groupedByExercise.entries()) {
+          await trx('session_sets')
+            .where({ session_id: sessionId, exercise_id: exerciseId })
+            .del();
+
+          if (exerciseRows.length) {
+            const timestamp = trx.fn.now();
+            await trx('session_sets').insert(
+              exerciseRows.map((row) => ({
+                ...row,
+                created_at: timestamp,
+                updated_at: timestamp,
+              }))
+            );
           }
         }
       });

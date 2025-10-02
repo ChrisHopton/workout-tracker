@@ -1,29 +1,25 @@
-function notFound(req, res, next) {
-  res.status(404).json({ error: { message: 'Not Found' } });
-}
-
-function errorHandler(err, req, res, next) {
-  console.error(err);
-  const status = err.status || 500;
-  res.status(status).json({
-    error: {
-      message: err.message || 'Internal Server Error',
-      details: err.details || null,
-    },
-  });
-}
-
-function createHttpError(status, message, details) {
-  const error = new Error(message);
-  error.status = status;
-  if (details) {
-    error.details = details;
+class AppError extends Error {
+  constructor(message, status = 500, details) {
+    super(message);
+    this.status = status;
+    this.details = details;
   }
-  return error;
+}
+
+class NotFoundError extends AppError {
+  constructor(message = 'Resource not found', details) {
+    super(message, 404, details);
+  }
+}
+
+class BadRequestError extends AppError {
+  constructor(message = 'Bad request', details) {
+    super(message, 400, details);
+  }
 }
 
 module.exports = {
-  notFound,
-  errorHandler,
-  createHttpError,
+  AppError,
+  NotFoundError,
+  BadRequestError,
 };

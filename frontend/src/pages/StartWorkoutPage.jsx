@@ -74,10 +74,11 @@ function StartWorkoutPage() {
   const [sessionId, setSessionId] = useState(null);
   const [exerciseState, setExerciseState] = useState({});
   const initializedSessionRef = useRef(null);
+  const numericProfileId = profileId ? Number(profileId) : undefined;
 
   const startSession = useStartSession();
   const finishSession = useFinishSession();
-  const saveSessionSets = useSaveSessionSets(sessionId);
+  const saveSessionSets = useSaveSessionSets(sessionId, numericProfileId);
 
   useEffect(() => {
     if (!workout || sessionLookup.isLoading) return;
@@ -190,7 +191,7 @@ function StartWorkoutPage() {
     }
 
     try {
-      await saveSessionSets.mutateAsync({ sets: payloadSets });
+      await saveSessionSets.mutateAsync({ sets: payloadSets, profileId: numericProfileId });
       setExerciseState((prev) => ({
         ...prev,
         [exercise.workout_exercise_id]: {
@@ -213,7 +214,7 @@ function StartWorkoutPage() {
       actual_weight: null,
     }));
     try {
-      await saveSessionSets.mutateAsync({ sets: payloadSets });
+      await saveSessionSets.mutateAsync({ sets: payloadSets, profileId: numericProfileId });
       setExerciseState((prev) => ({
         ...prev,
         [exercise.workout_exercise_id]: {
@@ -245,7 +246,7 @@ function StartWorkoutPage() {
       return;
     }
     finishSession.mutate(
-      { sessionId, body: { ended_at: dayjs().toISOString() }, profileId: Number(profileId) },
+      { sessionId, body: { ended_at: dayjs().toISOString() }, profileId: numericProfileId },
       {
         onSuccess: () => {
           notify({ message: 'Workout saved', variant: 'success' });

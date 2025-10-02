@@ -111,7 +111,7 @@ export function useStartSession() {
   });
 }
 
-export function useSaveSessionSets(sessionId) {
+export function useSaveSessionSets(sessionId, profileId) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload) => {
@@ -121,12 +121,22 @@ export function useSaveSessionSets(sessionId) {
       }
       const body = { ...payload };
       delete body.sessionId;
+      delete body.profileId;
       return apiRequest(`/sessions/${id}/sets/bulk`, { method: 'POST', body });
     },
     onSuccess: (_data, variables) => {
       const id = variables.sessionId ?? sessionId;
       if (id) {
         queryClient.invalidateQueries({ queryKey: ['session-sets', id] });
+      }
+      const profileKey = variables.profileId ?? profileId;
+      if (profileKey) {
+        queryClient.invalidateQueries({ queryKey: ['profile-summary', profileKey] });
+        queryClient.invalidateQueries({ queryKey: ['stats-overview', profileKey] });
+        queryClient.invalidateQueries({ queryKey: ['stats-volume', profileKey] });
+        queryClient.invalidateQueries({ queryKey: ['stats-sets-muscle', profileKey] });
+        queryClient.invalidateQueries({ queryKey: ['stats-intensity', profileKey] });
+        queryClient.invalidateQueries({ queryKey: ['stats-e1rm', profileKey] });
       }
     },
   });
@@ -144,6 +154,7 @@ export function useFinishSession() {
         queryClient.invalidateQueries({ queryKey: ['stats-volume', variables.profileId] });
         queryClient.invalidateQueries({ queryKey: ['stats-sets-muscle', variables.profileId] });
         queryClient.invalidateQueries({ queryKey: ['stats-intensity', variables.profileId] });
+        queryClient.invalidateQueries({ queryKey: ['stats-e1rm', variables.profileId] });
       }
     },
   });
